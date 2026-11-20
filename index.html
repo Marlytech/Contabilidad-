@@ -33,7 +33,6 @@
       <h2 class="text-lg font-bold tracking-tight">Acceso Protegido</h2>
       <p class="text-xs text-blue-100/75 mt-1 mb-5">Ingresa tu PIN de 4 dígitos para continuar</p>
 
-      <!-- Indicadores de dígitos -->
       <div class="flex justify-center gap-3 mb-3">
         <div id="dot-0" class="w-3.5 h-3.5 rounded-full border-2 border-white/40 transition-all"></div>
         <div id="dot-1" class="w-3.5 h-3.5 rounded-full border-2 border-white/40 transition-all"></div>
@@ -43,7 +42,6 @@
 
       <p id="pin-error" class="text-xs text-rose-300 h-4 mb-3 font-medium"></p>
 
-      <!-- Teclado numérico -->
       <div class="grid grid-cols-3 gap-2.5 text-lg font-bold">
         <button onclick="pressPin('1')" class="py-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition cursor-pointer">1</button>
         <button onclick="pressPin('2')" class="py-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition cursor-pointer">2</button>
@@ -63,7 +61,7 @@
     </div>
   </div>
 
-  <!-- Header -->
+  <!-- HEADER -->
   <header class="bg-gradient-to-r from-slate-900 via-blue-900 to-emerald-800 text-white shadow-lg no-print border-b border-white/10">
     <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-4">
       <div class="flex items-center gap-3">
@@ -96,13 +94,13 @@
     </div>
   </header>
 
-  <!-- Main Content -->
+  <!-- MAIN CONTENT -->
   <main class="max-w-6xl mx-auto px-4 py-6 flex-grow w-full">
 
     <!-- DASHBOARD VIEW -->
     <div id="view-dashboard" class="space-y-6">
 
-      <!-- KPI Cards -->
+      <!-- KPI CARDS -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80">
           <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">
@@ -144,7 +142,7 @@
         </div>
       </div>
 
-      <!-- Form + Movements Grid -->
+      <!-- FORM + MOVEMENTS GRID -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
         <!-- Left: New Transaction Form -->
@@ -337,7 +335,7 @@
     const STORAGE_KEY = 'consultoria_contabilidad_v2';
     const CONFIG_KEY = 'consultoria_config_v2';
 
-    const DEFAULT_CONFIG = {
+    const CONFIG = {
       pin: '2315',
       sheetUrl: 'https://script.google.com/macros/s/AKfycbwALKn8T9y1uYsXvyi1txt8B91mkL0e-uskyRYYHshudHsZTr-rUzoE7sqPpUJuy4Gj/exec'
     };
@@ -378,36 +376,43 @@
 
     function normalizeTx(tx) {
       return {
-        ...tx,
+        id: Number(tx.id) || Date.now(),
+        type: String(tx.type || 'expense').trim(),
+        desc: String(tx.desc || '').trim(),
         amount: Number(tx.amount) || 0,
-        date: formatDateClean(tx.date)
+        date: formatDateClean(tx.date),
+        category: String(tx.category || '').trim(),
+        method: String(tx.method || '').trim()
       };
     }
 
     const todayStr = formatDateClean(new Date());
 
-    const defaultData = [
-      {
-        id: 1,
-        type: 'capital',
-        desc: 'Capital inicial aportado (Fondo de arranque)',
-        amount: 1500,
-        date: todayStr,
-        category: 'Capital Inicial',
-        method: 'Fondo Propio'
-      }
-    ];
-
-    let savedConfig = JSON.parse(localStorage.getItem(CONFIG_KEY));
-    let config = {
-      pin: (savedConfig && savedConfig.pin) || DEFAULT_CONFIG.pin,
-      sheetUrl: (savedConfig && savedConfig.sheetUrl) || DEFAULT_CONFIG.sheetUrl
+    const defaultCapitalTx = {
+      id: 1,
+      type: 'capital',
+      desc: 'Capital inicial aportado (Fondo de arranque)',
+      amount: 1500,
+      date: todayStr,
+      category: 'Capital Inicial',
+      method: 'Fondo Propio'
     };
+
+    function ensureCapitalExists(list) {
+      const clean = (Array.isArray(list) ? list : []).map(normalizeTx);
+      const hasCapital = clean.some(t => t.type === 'capital');
+      if (!hasCapital) {
+        return [...clean, { ...defaultCapitalTx }];
+      }
+      return clean;
+    }
+
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(CONFIG));
     let rawSaved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    let transactions = Array.isArray(rawSaved) ? rawSaved.map(normalizeTx) : defaultData;
+    let transactions = ensureCapitalExists(rawSaved);
     let enteredPin = '';
 
-    // --- PIN LOCK LOGIC ---
+    // --- PIN LOCK ---
     function updatePinDots() {
       for (let i = 0; i < 4; i++) {
         const dot = document.getElementById('dot-' + i);
@@ -439,16 +444,14 @@
     }
 
     async function verifyPin() {
-      if (config.sheetUrl) {
+      if (CONFIG.sheetUrl) {
         document.getElementById('pin-error').textContent = 'Verificando en nube privada...';
         try {
-          const res = await fetch(`${config.sheetUrl}?pin=${encodeURIComponent(enteredPin)}`);
+          const res = await fetch(`${CONFIG.sheetUrl}?pin=${encodeURIComponent(enteredPin)}`);
           const json = await res.json();
           if (json.status === 'ok') {
-            config.pin = enteredPin;
-            localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
             if (Array.isArray(json.data) && json.data.length > 0) {
-              transactions = json.data.map(normalizeTx);
+              transactions = ensureCapitalExists(json.data);
               saveData();
             }
             unlockApp();
@@ -458,7 +461,7 @@
             return;
           }
         } catch (err) {
-          if (enteredPin === config.pin) {
+          if (enteredPin === CONFIG.pin) {
             unlockApp();
             return;
           }
@@ -467,7 +470,7 @@
         }
       }
 
-      if (enteredPin === config.pin) {
+      if (enteredPin === CONFIG.pin) {
         unlockApp();
       } else {
         failPin('PIN incorrecto');
@@ -510,7 +513,7 @@
       const badge = document.getElementById('sync-badge');
       const btnSync = document.getElementById('btn-sync');
       const footer = document.getElementById('status-footer');
-      if (config.sheetUrl) {
+      if (CONFIG.sheetUrl) {
         badge.textContent = 'Nube Privada Activa';
         badge.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-200 border border-emerald-300/30';
         btnSync.classList.remove('hidden');
@@ -524,18 +527,23 @@
     }
 
     async function syncFromCloud() {
-      if (!config.sheetUrl) return;
+      if (!CONFIG.sheetUrl) return;
       const btn = document.getElementById('btn-sync');
       btn.classList.add('opacity-50');
       try {
-        const res = await fetch(`${config.sheetUrl}?pin=${encodeURIComponent(config.pin)}`);
+        const res = await fetch(`${CONFIG.sheetUrl}?pin=${encodeURIComponent(CONFIG.pin)}`);
         const json = await res.json();
         if (json.status === 'ok') {
-          transactions = Array.isArray(json.data) && json.data.length > 0
-            ? json.data.map(normalizeTx)
-            : defaultData;
+          const cloudItems = Array.isArray(json.data) ? json.data.map(normalizeTx) : [];
+          const hasCloudCapital = cloudItems.some(t => t.type === 'capital');
+          transactions = cloudItems.length > 0 ? ensureCapitalExists(cloudItems) : [{ ...defaultCapitalTx }];
           saveData();
           renderAll();
+
+          // Si el capital inicial no existía en la hoja, lo sube para que quede respaldado
+          if (!hasCloudCapital) {
+            await pushToCloud({ action: 'add', transaction: { ...defaultCapitalTx } });
+          }
         }
       } catch {
         alert('No se pudo sincronizar con Google Sheets. Revisa tu conexión o la URL.');
@@ -544,11 +552,12 @@
     }
 
     async function pushToCloud(payload) {
-      if (!config.sheetUrl) return;
+      if (!CONFIG.sheetUrl) return;
       try {
-        await fetch(config.sheetUrl, {
+        await fetch(CONFIG.sheetUrl, {
           method: 'POST',
-          body: JSON.stringify({ ...payload, pin: config.pin })
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ ...payload, pin: CONFIG.pin })
         });
       } catch (e) {
         console.error('Error enviando a nube:', e);
@@ -619,7 +628,7 @@
 
     async function deleteTransaction(id) {
       if (!confirm('¿Eliminar este movimiento?')) return;
-      transactions = transactions.filter(t => t.id !== id);
+      transactions = transactions.filter(t => Number(t.id) !== Number(id));
       saveData();
       renderAll();
       await pushToCloud({ action: 'delete', id });
@@ -694,7 +703,6 @@
         }).join('');
       }
 
-      // Report View
       document.getElementById('report-date').textContent = 'Generado el ' + new Date().toLocaleDateString('es-MX', { dateStyle: 'full' });
       document.getElementById('rep-capital').textContent = formatMoney(totalCapital);
       document.getElementById('rep-income').textContent = formatMoney(totalIncome);
@@ -811,7 +819,7 @@
         try {
           const parsed = JSON.parse(evt.target.result);
           if (Array.isArray(parsed)) {
-            transactions = parsed.map(normalizeTx);
+            transactions = ensureCapitalExists(parsed);
             saveData();
             renderAll();
             alert('Respaldo restaurado correctamente.');
@@ -823,16 +831,18 @@
       reader.readAsText(file);
     }
 
-    function resetData() {
-      if (!confirm('¿Seguro que deseas reiniciar todos los registros locales al capital inicial de $1,500?')) return;
-      transactions = JSON.parse(JSON.stringify(defaultData));
+    async function resetData() {
+      if (!confirm('¿Seguro que deseas reiniciar todos los registros al capital inicial de $1,500?')) return;
+      transactions = [{ ...defaultCapitalTx }];
       saveData();
       renderAll();
+      await pushToCloud({ action: 'reset' });
     }
 
     // Init
     document.getElementById('tx-date').value = todayStr;
     setFormType('expense');
+    renderAll();
     lucide.createIcons();
   </script>
 </body>
