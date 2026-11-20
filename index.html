@@ -60,7 +60,6 @@
           <i data-lucide="delete" class="w-5 h-5"></i>
         </button>
       </div>
-      <p class="text-[11px] text-white/40 mt-4">PIN inicial por defecto: 1234</p>
     </div>
   </div>
 
@@ -354,16 +353,16 @@
       <div class="space-y-4 text-sm">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">1. PIN de Acceso (4 dígitos)</label>
-          <input type="password" id="cfg-pin" maxlength="4" pattern="\d{4}" placeholder="Ej. 1234"
+          <input type="password" id="cfg-pin" maxlength="4" pattern="\d{4}" placeholder="Ej. 2315"
             class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" />
-          <p class="text-[11px] text-slate-500 mt-1">Si conectas Google Sheets, debe coincidir con el <code>PIN_SECRETO</code> de tu script.</p>
+          <p class="text-[11px] text-slate-500 mt-1">Debe coincidir con el <code>PIN_SECRETO</code> configurado en tu Google Apps Script.</p>
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">2. URL de Google Apps Script (Opcional — Nube Privada)</label>
+          <label class="block text-xs font-bold text-slate-700 mb-1">2. URL de Google Apps Script (Nube Privada)</label>
           <input type="url" id="cfg-url" placeholder="https://script.google.com/macros/s/.../exec"
             class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-xs" />
-          <p class="text-[11px] text-slate-500 mt-1">Pega aquí la URL de tu hoja de Google Sheets para sincronizar entre celular y computadora.</p>
+          <p class="text-[11px] text-slate-500 mt-1">Sincroniza tus movimientos con tu hoja de Google Sheets.</p>
         </div>
 
         <div class="flex gap-2 pt-2">
@@ -380,7 +379,13 @@
 
   <script>
     const STORAGE_KEY = 'consultoria_contabilidad_v2';
-    const CONFIG_KEY = 'consultoria_config_v1';
+    const CONFIG_KEY = 'consultoria_config_v2';
+
+    // Configuración precargada con tu PIN y URL de Google Apps Script
+    const DEFAULT_CONFIG = {
+      pin: '2315',
+      sheetUrl: 'https://script.google.com/macros/s/AKfycbwALKn8T9y1uYsXvyi1txt8B91mkL0e-uskyRYYHshudHsZTr-rUzoE7sqPpUJuy4Gj/exec'
+    };
 
     const CATEGORIES = {
       expense: [
@@ -415,7 +420,11 @@
       }
     ];
 
-    let config = JSON.parse(localStorage.getItem(CONFIG_KEY)) || { pin: '1234', sheetUrl: '' };
+    let savedConfig = JSON.parse(localStorage.getItem(CONFIG_KEY));
+    let config = {
+      pin: (savedConfig && savedConfig.pin) || DEFAULT_CONFIG.pin,
+      sheetUrl: (savedConfig && savedConfig.sheetUrl) || DEFAULT_CONFIG.sheetUrl
+    };
     let transactions = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultData;
     let enteredPin = '';
 
@@ -451,7 +460,6 @@
     }
 
     async function verifyPin() {
-      // Si hay URL de nube, validar contra Google Sheets
       if (config.sheetUrl) {
         document.getElementById('pin-error').textContent = 'Verificando en nube privada...';
         try {
@@ -471,7 +479,6 @@
             return;
           }
         } catch (err) {
-          // Si no hay internet, cae a validación local
           if (enteredPin === config.pin) {
             unlockApp();
             return;
@@ -481,7 +488,6 @@
         }
       }
 
-      // Modo Local
       if (enteredPin === config.pin) {
         unlockApp();
       } else {
@@ -513,7 +519,6 @@
       document.getElementById('lock-screen').classList.remove('hidden');
     }
 
-    // Permitir teclado físico en computadora para el PIN
     document.addEventListener('keydown', (e) => {
       if (!document.getElementById('lock-screen').classList.contains('hidden')) {
         if (e.key >= '0' && e.key <= '9') pressPin(e.key);
