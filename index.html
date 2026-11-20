@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contabilidad Consultoría — Control Privado</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white !important; }
+      .card-shadow { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-6px); }
+      75% { transform: translateX(6px); }
+    }
+    .animate-shake { animation: shake 0.25s ease-in-out 2; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- PANTALLA DE BLOQUEO CON PIN DE 4 DÍGITOS -->
+  <div id="lock-screen" class="fixed inset-0 bg-gradient-to-br from-slate-900 via-blue-950 to-emerald-950 z-50 flex items-center justify-center p-4">
+    <div id="lock-card" class="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-7 max-w-xs w-full text-white shadow-2xl text-center">
+      <div class="w-14 h-14 bg-emerald-400/20 border border-emerald-300/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <i data-lucide="lock" class="w-7 h-7 text-emerald-300"></i>
+      </div>
+      <h2 class="text-lg font-bold tracking-tight">Acceso Protegido</h2>
+      <p class="text-xs text-blue-100/75 mt-1 mb-5">Ingresa tu PIN de 4 dígitos para continuar</p>
+
+      <!-- Indicadores de dígitos -->
+      <div class="flex justify-center gap-3 mb-3">
+        <div id="dot-0" class="w-3.5 h-3.5 rounded-full border-2 border-white/40 transition-all"></div>
+        <div id="dot-1" class="w-3.5 h-3.5 rounded-full border-2 border-white/40 transition-all"></div>
+        <div id="dot-2" class="w-3.5 h-3.5 rounded-full border-2 border-white/40 transition-all"></div>
+        <div id="dot-3" class="w-3.5 h-3.5 rounded-full border-2 border-white/40 transition-all"></div>
+      </div>
+
+      <p id="pin-error" class="text-xs text-rose-300 h-4 mb-3 font-medium"></p>
+
+      <!-- Teclado numérico -->
+      <div class="grid grid-cols-3 gap-2.5 text-lg font-bold">
+        <button onclick="pressPin('1')" class="py-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition cursor-pointer">1</button>
+        <button onclick="pressPin('2')" class="py-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition cursor-pointer">2</button>
+        <button onclick="pressPin('3')" class="py-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition cursor-pointer">3</button>
+        <button onclick="pressPin('4')" class="py-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition cursor-pointer">4</button>
+        <button onclick="pressPin('5')" class="py-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition cursor-pointer">5</button>
+        <button onclick="pressPin('6')" class="py-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition cursor-pointer">6</button>
+        <button onclick="pressPin('7')" class="py-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition cursor-pointer">7</button>
+        <button onclick="pressPin('8')" class="py-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition cursor-pointer">8</button>
+        <button onclick="pressPin('9')" class="py-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition cursor-pointer">9</button>
+        <button onclick="clearPin()" class="py-3 rounded-xl text-xs font-semibold text-blue-200 hover:bg-white/10 transition cursor-pointer">Limpiar</button>
+        <button onclick="pressPin('0')" class="py-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition cursor-pointer">0</button>
+        <button onclick="backspacePin()" class="py-3 rounded-xl flex items-center justify-center hover:bg-white/10 transition cursor-pointer">
+          <i data-lucide="delete" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <p class="text-[11px] text-white/40 mt-4">PIN inicial por defecto: 1234</p>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-slate-900 via-blue-900 to-emerald-800 text-white shadow-lg no-print border-b border-white/10">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="bg-white/15 backdrop-blur-sm border border-white/25 p-2.5 rounded-xl shadow-inner">
+          <i data-lucide="briefcase" class="w-6 h-6 text-emerald-300"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold tracking-tight text-white">Contabilidad Consultoría</h1>
+            <span id="sync-badge" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white/15 text-blue-100">Modo Local</span>
+          </div>
+          <p class="text-xs text-blue-100/80">Control Privado de Caja, Compras e Ingresos</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <button onclick="openSettingsModal()" class="flex items-center gap-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white px-3 py-2 rounded-xl transition cursor-pointer">
+          <i data-lucide="cloud-cog" class="w-4 h-4 text-emerald-300"></i>
+          <span>Nube y PIN</span>
+        </button>
+        <button onclick="lockApp()" title="Bloquear pantalla" class="flex items-center gap-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white px-3 py-2 rounded-xl transition cursor-pointer">
+          <i data-lucide="lock" class="w-4 h-4"></i>
+          <span>Bloquear</span>
+        </button>
+        <button onclick="toggleView('report')" id="btn-nav-report" class="flex items-center gap-1.5 text-xs font-semibold bg-emerald-400 hover:bg-emerald-300 text-slate-950 px-4 py-2 rounded-xl shadow-md transition cursor-pointer">
+          <i data-lucide="file-bar-chart-2" class="w-4 h-4"></i>
+          <span>Ver Reporte</span>
+        </button>
+        <button onclick="toggleView('dashboard')" id="btn-nav-dash" class="hidden flex items-center gap-1.5 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-900 px-4 py-2 rounded-xl shadow-md transition cursor-pointer">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i>
+          <span>Volver a Registro</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-6xl mx-auto px-4 py-6 flex-grow w-full">
+
+    <!-- DASHBOARD VIEW -->
+    <div id="view-dashboard" class="space-y-6">
+
+      <!-- KPI Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80">
+          <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">
+            <span>Saldo en Caja Actual</span>
+            <i data-lucide="wallet" class="w-4 h-4 text-blue-600"></i>
+          </div>
+          <div id="kpi-balance" class="text-2xl font-extrabold text-slate-900">$1,500.00</div>
+          <div class="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+            <div id="capital-bar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-300" style="width: 100%"></div>
+          </div>
+          <p id="kpi-balance-note" class="text-[11px] text-slate-500 mt-1.5">100% del capital inicial disponible</p>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80">
+          <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">
+            <span>Capital Aportado</span>
+            <i data-lucide="piggy-bank" class="w-4 h-4 text-indigo-600"></i>
+          </div>
+          <div id="kpi-capital" class="text-2xl font-extrabold text-indigo-600">$1,500.00</div>
+          <p class="text-[11px] text-slate-500 mt-2">Fondo propio invertido al arranque</p>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80">
+          <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">
+            <span>Ingresos por Ventas</span>
+            <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
+          </div>
+          <div id="kpi-income" class="text-2xl font-extrabold text-emerald-600">$0.00</div>
+          <p class="text-[11px] text-slate-500 mt-2">Servicios y productos cobrados</p>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80">
+          <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">
+            <span>Total Gastado</span>
+            <i data-lucide="shopping-bag" class="w-4 h-4 text-rose-600"></i>
+          </div>
+          <div id="kpi-expenses" class="text-2xl font-extrabold text-rose-600">$0.00</div>
+          <p class="text-[11px] text-slate-500 mt-2">Compras, material y operación</p>
+        </div>
+      </div>
+
+      <!-- Form + Movements Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left: New Transaction Form -->
+        <div class="lg:col-span-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 h-fit">
+          <h2 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <i data-lucide="plus-circle" class="w-5 h-5 text-blue-600"></i>
+            <span>Registrar Movimiento</span>
+          </h2>
+
+          <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl mb-4">
+            <button type="button" id="tab-expense" onclick="setFormType('expense')" class="py-2 text-xs font-bold rounded-lg bg-white text-rose-600 shadow-sm transition cursor-pointer">
+              - Registrar Gasto
+            </button>
+            <button type="button" id="tab-income" onclick="setFormType('income')" class="py-2 text-xs font-bold rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer">
+              + Registrar Ingreso
+            </button>
+          </div>
+
+          <form id="tx-form" onsubmit="addTransaction(event)" class="space-y-3.5">
+            <input type="hidden" id="tx-type" value="expense" />
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Concepto / Descripción</label>
+              <input type="text" id="tx-desc" required placeholder="Ej. Compra de carpetas / Asesoría Cliente A"
+                class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Monto ($ MXN)</label>
+                <input type="number" id="tx-amount" step="0.01" min="0.01" required placeholder="0.00"
+                  class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Fecha</label>
+                <input type="date" id="tx-date" required
+                  class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Categoría</label>
+              <select id="tx-category" class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"></select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Método de Pago / Comprobante</label>
+              <select id="tx-method" class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                <option value="Efectivo (Ticket)">Efectivo (Con Ticket/Nota)</option>
+                <option value="Tarjeta Débito/Crédito">Tarjeta Débito / Crédito</option>
+                <option value="Transferencia SPEI">Transferencia SPEI</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+
+            <button type="submit" id="btn-submit" class="w-full py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm rounded-xl shadow-sm transition cursor-pointer mt-2">
+              Guardar Compra / Gasto
+            </button>
+          </form>
+        </div>
+
+        <!-- Right: Transactions History -->
+        <div class="lg:col-span-7 bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="list-ordered" class="w-5 h-5 text-blue-600"></i>
+              <span>Historial de Movimientos</span>
+            </h2>
+
+            <div class="flex items-center gap-2">
+              <button onclick="syncFromCloud()" id="btn-sync" class="hidden text-xs font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition cursor-pointer" title="Sincronizar con Google Sheets">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                <span>Sincronizar</span>
+              </button>
+              <select id="filter-type" onchange="renderAll()" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white outline-none">
+                <option value="all">Todos</option>
+                <option value="expense">Solo Gastos</option>
+                <option value="income">Solo Ingresos</option>
+                <option value="capital">Solo Capital</option>
+              </select>
+              <button onclick="exportCSV()" title="Exportar a Excel" class="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition cursor-pointer">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span>Excel</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto flex-grow">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-200 text-[11px] uppercase text-slate-500 font-semibold">
+                  <th class="py-2.5 px-2">Fecha</th>
+                  <th class="py-2.5 px-2">Concepto / Categoría</th>
+                  <th class="py-2.5 px-2 text-right">Monto</th>
+                  <th class="py-2.5 px-2 text-center">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="tx-table-body" class="divide-y divide-slate-100 text-sm"></tbody>
+            </table>
+          </div>
+
+          <!-- Backup Controls -->
+          <div class="mt-5 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+            <span id="status-footer">Respaldo local activo</span>
+            <div class="flex items-center gap-3">
+              <button onclick="downloadBackup()" class="text-blue-600 hover:underline font-medium cursor-pointer">Respaldo (.JSON)</button>
+              <label class="text-slate-600 hover:underline font-medium cursor-pointer">
+                Restaurar
+                <input type="file" accept=".json" onchange="restoreBackup(event)" class="hidden" />
+              </label>
+              <button onclick="resetData()" class="text-rose-500 hover:underline cursor-pointer">Reiniciar</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- REPORT VIEW -->
+    <div id="view-report" class="hidden space-y-6">
+      <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200 card-shadow">
+        <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5 mb-6">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Estado de Resultados y Caja</span>
+            <h2 class="text-2xl font-extrabold text-slate-900 mt-0.5">Reporte Ejecutivo de Consultoría</h2>
+            <p id="report-date" class="text-xs text-slate-500 mt-1"></p>
+          </div>
+          <div class="flex gap-2 no-print">
+            <button onclick="window.print()" class="flex items-center gap-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-sm transition cursor-pointer">
+              <i data-lucide="printer" class="w-4 h-4"></i>
+              <span>Imprimir / Guardar PDF</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/70">
+            <p class="text-xs text-slate-500 font-medium">Capital Aportado</p>
+            <p id="rep-capital" class="text-xl font-bold text-slate-900 mt-1">$1,500.00</p>
+          </div>
+          <div class="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200/70">
+            <p class="text-xs text-emerald-700 font-medium">Ingresos Operativos</p>
+            <p id="rep-income" class="text-xl font-bold text-emerald-700 mt-1">$0.00</p>
+          </div>
+          <div class="p-4 rounded-xl bg-rose-50/70 border border-rose-200/70">
+            <p class="text-xs text-rose-700 font-medium">Gastos Totales</p>
+            <p id="rep-expenses" class="text-xl font-bold text-rose-700 mt-1">$0.00</p>
+          </div>
+          <div class="p-4 rounded-xl bg-blue-50/70 border border-blue-200/70">
+            <p class="text-xs text-blue-700 font-medium">Resultado Operativo (Ventas - Gastos)</p>
+            <p id="rep-profit" class="text-xl font-bold text-blue-700 mt-1">$0.00</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3 border-b pb-2">Desglose de Gastos por Categoría</h3>
+            <div id="rep-expense-cats" class="space-y-3"></div>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3 border-b pb-2">Desglose de Ingresos por Categoría</h3>
+            <div id="rep-income-cats" class="space-y-3"></div>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Detalle Completo de Movimientos</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-100 text-slate-600 uppercase">
+                  <th class="py-2.5 px-3 rounded-l-lg">Fecha</th>
+                  <th class="py-2.5 px-3">Tipo</th>
+                  <th class="py-2.5 px-3">Categoría</th>
+                  <th class="py-2.5 px-3">Concepto</th>
+                  <th class="py-2.5 px-3">Método</th>
+                  <th class="py-2.5 px-3 text-right rounded-r-lg">Monto</th>
+                </tr>
+              </thead>
+              <tbody id="rep-full-table" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL: NUBE GOOGLE SHEETS Y PIN -->
+  <div id="settings-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="shield-check" class="w-5 h-5 text-emerald-600"></i>
+          <span>Seguridad PIN y Nube Privada</span>
+        </h3>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-700 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-sm">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">1. PIN de Acceso (4 dígitos)</label>
+          <input type="password" id="cfg-pin" maxlength="4" pattern="\d{4}" placeholder="Ej. 1234"
+            class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" />
+          <p class="text-[11px] text-slate-500 mt-1">Si conectas Google Sheets, debe coincidir con el <code>PIN_SECRETO</code> de tu script.</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">2. URL de Google Apps Script (Opcional — Nube Privada)</label>
+          <input type="url" id="cfg-url" placeholder="https://script.google.com/macros/s/.../exec"
+            class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-xs" />
+          <p class="text-[11px] text-slate-500 mt-1">Pega aquí la URL de tu hoja de Google Sheets para sincronizar entre celular y computadora.</p>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button onclick="saveSettings()" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl cursor-pointer">
+            Guardar Configuración
+          </button>
+          <button onclick="closeSettingsModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'consultoria_contabilidad_v2';
+    const CONFIG_KEY = 'consultoria_config_v1';
+
+    const CATEGORIES = {
+      expense: [
+        'Material e Insumos',
+        'Papelería e Impresiones',
+        'Software y Herramientas',
+        'Transporte y Viáticos',
+        'Publicidad y Branding',
+        'Trámites y Legal',
+        'Otros Gastos'
+      ],
+      income: [
+        'Servicio de Consultoría',
+        'Venta de Producto',
+        'Anticipo de Proyecto',
+        'Aportación Extra de Capital',
+        'Otros Ingresos'
+      ]
+    };
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const defaultData = [
+      {
+        id: 1,
+        type: 'capital',
+        desc: 'Capital inicial aportado (Fondo de arranque)',
+        amount: 1500,
+        date: todayStr,
+        category: 'Capital Inicial',
+        method: 'Fondo Propio'
+      }
+    ];
+
+    let config = JSON.parse(localStorage.getItem(CONFIG_KEY)) || { pin: '1234', sheetUrl: '' };
+    let transactions = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultData;
+    let enteredPin = '';
+
+    // --- PIN LOCK LOGIC ---
+    function updatePinDots() {
+      for (let i = 0; i < 4; i++) {
+        const dot = document.getElementById('dot-' + i);
+        dot.className = i < enteredPin.length
+          ? 'w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-emerald-300 scale-110 transition-all'
+          : 'w-3.5 h-3.5 rounded-full border-2 border-white/40 transition-all';
+      }
+    }
+
+    function pressPin(num) {
+      if (enteredPin.length >= 4) return;
+      document.getElementById('pin-error').textContent = '';
+      enteredPin += num;
+      updatePinDots();
+      if (enteredPin.length === 4) {
+        setTimeout(verifyPin, 120);
+      }
+    }
+
+    function backspacePin() {
+      enteredPin = enteredPin.slice(0, -1);
+      updatePinDots();
+    }
+
+    function clearPin() {
+      enteredPin = '';
+      document.getElementById('pin-error').textContent = '';
+      updatePinDots();
+    }
+
+    async function verifyPin() {
+      // Si hay URL de nube, validar contra Google Sheets
+      if (config.sheetUrl) {
+        document.getElementById('pin-error').textContent = 'Verificando en nube privada...';
+        try {
+          const res = await fetch(`${config.sheetUrl}?pin=${encodeURIComponent(enteredPin)}`);
+          const json = await res.json();
+          if (json.status === 'ok') {
+            config.pin = enteredPin;
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+            if (json.data && json.data.length > 0) {
+              transactions = json.data;
+              saveData();
+            }
+            unlockApp();
+            return;
+          } else {
+            failPin('PIN incorrecto');
+            return;
+          }
+        } catch (err) {
+          // Si no hay internet, cae a validación local
+          if (enteredPin === config.pin) {
+            unlockApp();
+            return;
+          }
+          failPin('Sin conexión y PIN local no coincide');
+          return;
+        }
+      }
+
+      // Modo Local
+      if (enteredPin === config.pin) {
+        unlockApp();
+      } else {
+        failPin('PIN incorrecto');
+      }
+    }
+
+    function failPin(msg) {
+      document.getElementById('pin-error').textContent = msg;
+      const card = document.getElementById('lock-card');
+      card.classList.add('animate-shake');
+      setTimeout(() => card.classList.remove('animate-shake'), 500);
+      enteredPin = '';
+      updatePinDots();
+    }
+
+    function unlockApp() {
+      enteredPin = '';
+      updatePinDots();
+      document.getElementById('lock-screen').classList.add('hidden');
+      updateCloudUI();
+      renderAll();
+    }
+
+    function lockApp() {
+      enteredPin = '';
+      updatePinDots();
+      document.getElementById('pin-error').textContent = '';
+      document.getElementById('lock-screen').classList.remove('hidden');
+    }
+
+    // Permitir teclado físico en computadora para el PIN
+    document.addEventListener('keydown', (e) => {
+      if (!document.getElementById('lock-screen').classList.contains('hidden')) {
+        if (e.key >= '0' && e.key <= '9') pressPin(e.key);
+        if (e.key === 'Backspace') backspacePin();
+      }
+    });
+
+    // --- CLOUD SYNC ---
+    function updateCloudUI() {
+      const badge = document.getElementById('sync-badge');
+      const btnSync = document.getElementById('btn-sync');
+      const footer = document.getElementById('status-footer');
+      if (config.sheetUrl) {
+        badge.textContent = 'Nube Privada Activa';
+        badge.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-200 border border-emerald-300/30';
+        btnSync.classList.remove('hidden');
+        footer.textContent = 'Conectado a Google Sheets privado';
+      } else {
+        badge.textContent = 'Modo Local';
+        badge.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white/15 text-blue-100';
+        btnSync.classList.add('hidden');
+        footer.textContent = 'Guardado local en este navegador';
+      }
+    }
+
+    async function syncFromCloud() {
+      if (!config.sheetUrl) return;
+      const btn = document.getElementById('btn-sync');
+      btn.classList.add('opacity-50');
+      try {
+        const res = await fetch(`${config.sheetUrl}?pin=${encodeURIComponent(config.pin)}`);
+        const json = await res.json();
+        if (json.status === 'ok') {
+          transactions = json.data.length > 0 ? json.data : defaultData;
+          saveData();
+          renderAll();
+        }
+      } catch {
+        alert('No se pudo sincronizar con Google Sheets. Revisa tu conexión o la URL.');
+      }
+      btn.classList.remove('opacity-50');
+    }
+
+    async function pushToCloud(payload) {
+      if (!config.sheetUrl) return;
+      try {
+        await fetch(config.sheetUrl, {
+          method: 'POST',
+          body: JSON.stringify({ ...payload, pin: config.pin })
+        });
+      } catch (e) {
+        console.error('Error enviando a nube:', e);
+      }
+    }
+
+    // --- APP CORE ---
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    }
+
+    function formatMoney(num) {
+      return '$' + Number(num).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function setFormType(type) {
+      document.getElementById('tx-type').value = type;
+      const tabExp = document.getElementById('tab-expense');
+      const tabInc = document.getElementById('tab-income');
+      const btnSubmit = document.getElementById('btn-submit');
+      const catSelect = document.getElementById('tx-category');
+
+      if (type === 'expense') {
+        tabExp.className = 'py-2 text-xs font-bold rounded-lg bg-white text-rose-600 shadow-sm transition cursor-pointer';
+        tabInc.className = 'py-2 text-xs font-bold rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer';
+        btnSubmit.className = 'w-full py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm rounded-xl shadow-sm transition cursor-pointer mt-2';
+        btnSubmit.textContent = 'Guardar Compra / Gasto';
+      } else {
+        tabInc.className = 'py-2 text-xs font-bold rounded-lg bg-white text-emerald-600 shadow-sm transition cursor-pointer';
+        tabExp.className = 'py-2 text-xs font-bold rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer';
+        btnSubmit.className = 'w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm rounded-xl shadow-sm transition cursor-pointer mt-2';
+        btnSubmit.textContent = 'Guardar Ingreso / Venta';
+      }
+
+      catSelect.innerHTML = CATEGORIES[type].map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    async function addTransaction(e) {
+      e.preventDefault();
+      const formType = document.getElementById('tx-type').value;
+      const desc = document.getElementById('tx-desc').value.trim();
+      const amount = parseFloat(document.getElementById('tx-amount').value);
+      const date = document.getElementById('tx-date').value;
+      const category = document.getElementById('tx-category').value;
+      const method = document.getElementById('tx-method').value;
+
+      if (!desc || isNaN(amount) || amount <= 0) return;
+
+      const finalType = (formType === 'income' && category === 'Aportación Extra de Capital') ? 'capital' : formType;
+
+      const newTx = {
+        id: Date.now(),
+        type: finalType,
+        desc,
+        amount,
+        date,
+        category,
+        method
+      };
+
+      transactions.unshift(newTx);
+      saveData();
+      document.getElementById('tx-desc').value = '';
+      document.getElementById('tx-amount').value = '';
+      renderAll();
+      await pushToCloud({ action: 'add', transaction: newTx });
+    }
+
+    async function deleteTransaction(id) {
+      if (!confirm('¿Eliminar este movimiento?')) return;
+      transactions = transactions.filter(t => t.id !== id);
+      saveData();
+      renderAll();
+      await pushToCloud({ action: 'delete', id });
+    }
+
+    function renderAll() {
+      let totalCapital = 0;
+      let totalIncome = 0;
+      let totalExpenses = 0;
+
+      transactions.forEach(t => {
+        if (t.type === 'capital') totalCapital += t.amount;
+        else if (t.type === 'income') totalIncome += t.amount;
+        else if (t.type === 'expense') totalExpenses += t.amount;
+      });
+
+      const currentBalance = totalCapital + totalIncome - totalExpenses;
+      const operatingProfit = totalIncome - totalExpenses;
+
+      const balEl = document.getElementById('kpi-balance');
+      balEl.textContent = formatMoney(currentBalance);
+      balEl.className = `text-2xl font-extrabold ${currentBalance < 0 ? 'text-rose-600' : 'text-slate-900'}`;
+
+      document.getElementById('kpi-capital').textContent = formatMoney(totalCapital);
+      document.getElementById('kpi-income').textContent = formatMoney(totalIncome);
+      document.getElementById('kpi-expenses').textContent = formatMoney(totalExpenses);
+
+      const pct = totalCapital > 0 ? Math.max(0, Math.min(100, (currentBalance / totalCapital) * 100)) : 0;
+      const bar = document.getElementById('capital-bar');
+      bar.style.width = pct + '%';
+      bar.className = `h-1.5 rounded-full transition-all duration-300 ${currentBalance < 0 ? 'bg-rose-600' : currentBalance > totalCapital ? 'bg-emerald-500' : 'bg-blue-600'}`;
+
+      document.getElementById('kpi-balance-note').textContent =
+        currentBalance >= totalCapital
+          ? 'Capital inicial intacto + ganancias acumuladas'
+          : `${pct.toFixed(0)}% del capital inicial disponible`;
+
+      const filter = document.getElementById('filter-type').value;
+      const filtered = transactions.filter(t => filter === 'all' || t.type === filter);
+      const tbody = document.getElementById('tx-table-body');
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-slate-400 text-xs">No hay movimientos registrados en esta vista.</td></tr>`;
+      } else {
+        tbody.innerHTML = filtered.map(t => {
+          const isExp = t.type === 'expense';
+          const isCap = t.type === 'capital';
+          const badgeColor = isExp ? 'bg-rose-50 text-rose-700' : isCap ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700';
+          const amountColor = isExp ? 'text-rose-600' : isCap ? 'text-indigo-600' : 'text-emerald-600';
+          const sign = isExp ? '-' : '+';
+
+          return `
+            <tr class="hover:bg-slate-50/80 transition">
+              <td class="py-3 px-2 text-xs text-slate-500 whitespace-nowrap">${t.date}</td>
+              <td class="py-3 px-2">
+                <div class="font-medium text-slate-800 text-xs sm:text-sm">${t.desc}</div>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeColor}">${t.category}</span>
+                  <span class="text-[10px] text-slate-400">${t.method}</span>
+                </div>
+              </td>
+              <td class="py-3 px-2 text-right font-bold whitespace-nowrap ${amountColor}">${sign}${formatMoney(t.amount)}</td>
+              <td class="py-3 px-2 text-center">
+                <button onclick="deleteTransaction(${t.id})" class="text-slate-400 hover:text-rose-600 p-1 rounded transition cursor-pointer" title="Eliminar">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      // Report View
+      document.getElementById('report-date').textContent = 'Generado el ' + new Date().toLocaleDateString('es-MX', { dateStyle: 'full' });
+      document.getElementById('rep-capital').textContent = formatMoney(totalCapital);
+      document.getElementById('rep-income').textContent = formatMoney(totalIncome);
+      document.getElementById('rep-expenses').textContent = formatMoney(totalExpenses);
+
+      const repProfitEl = document.getElementById('rep-profit');
+      repProfitEl.textContent = formatMoney(operatingProfit);
+      repProfitEl.className = `text-xl font-bold mt-1 ${operatingProfit < 0 ? 'text-rose-700' : 'text-blue-700'}`;
+
+      renderCategoryBreakdown('expense', totalExpenses, 'rep-expense-cats', 'bg-rose-500');
+      renderCategoryBreakdown('income', totalIncome, 'rep-income-cats', 'bg-emerald-500');
+
+      document.getElementById('rep-full-table').innerHTML = transactions.map(t => {
+        const typeLabel = t.type === 'expense' ? 'Gasto' : t.type === 'capital' ? 'Capital' : 'Ingreso';
+        const sign = t.type === 'expense' ? '-' : '+';
+        return `
+          <tr>
+            <td class="py-2 px-3 whitespace-nowrap">${t.date}</td>
+            <td class="py-2 px-3 font-medium">${typeLabel}</td>
+            <td class="py-2 px-3">${t.category}</td>
+            <td class="py-2 px-3">${t.desc}</td>
+            <td class="py-2 px-3 text-slate-500">${t.method}</td>
+            <td class="py-2 px-3 text-right font-bold">${sign}${formatMoney(t.amount)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function renderCategoryBreakdown(type, total, containerId, barColor) {
+      const container = document.getElementById(containerId);
+      const map = {};
+      transactions.filter(t => t.type === type).forEach(t => {
+        map[t.category] = (map[t.category] || 0) + t.amount;
+      });
+
+      const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+      if (entries.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400">Sin movimientos registrados aún.</p>`;
+        return;
+      }
+
+      container.innerHTML = entries.map(([cat, val]) => {
+        const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+        return `
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="font-medium text-slate-700">${cat}</span>
+              <span class="font-bold text-slate-900">${formatMoney(val)} <span class="text-slate-400 font-normal">(${pct}%)</span></span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-2">
+              <div class="${barColor} h-2 rounded-full" style="width: ${pct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleView(view) {
+      const dash = document.getElementById('view-dashboard');
+      const rep = document.getElementById('view-report');
+      const btnRep = document.getElementById('btn-nav-report');
+      const btnDash = document.getElementById('btn-nav-dash');
+
+      if (view === 'report') {
+        dash.classList.add('hidden');
+        rep.classList.remove('hidden');
+        btnRep.classList.add('hidden');
+        btnDash.classList.remove('hidden');
+        renderAll();
+      } else {
+        rep.classList.add('hidden');
+        dash.classList.remove('hidden');
+        btnDash.classList.add('hidden');
+        btnRep.classList.remove('hidden');
+      }
+    }
+
+    function exportCSV() {
+      const headers = ['Fecha', 'Tipo', 'Categoria', 'Concepto', 'Metodo', 'Monto'];
+      const rows = transactions.map(t => [
+        t.date,
+        t.type === 'expense' ? 'Gasto' : t.type === 'capital' ? 'Capital' : 'Ingreso',
+        `"${t.category}"`,
+        `"${t.desc.replace(/"/g, '""')}"`,
+        `"${t.method}"`,
+        t.type === 'expense' ? -t.amount : t.amount
+      ]);
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `contabilidad_consultoria_${todayStr}.csv`;
+      a.click();
+    }
+
+    function downloadBackup() {
+      const blob = new Blob([JSON.stringify(transactions, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `respaldo_contabilidad_${todayStr}.json`;
+      a.click();
+    }
+
+    function restoreBackup(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const parsed = JSON.parse(evt.target.result);
+          if (Array.isArray(parsed)) {
+            transactions = parsed;
+            saveData();
+            renderAll();
+            alert('Respaldo restaurado correctamente.');
+          }
+        } catch {
+          alert('Archivo de respaldo no válido.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function resetData() {
+      if (!confirm('¿Seguro que deseas reiniciar todos los registros locales al capital inicial de $1,500?')) return;
+      transactions = JSON.parse(JSON.stringify(defaultData));
+      saveData();
+      renderAll();
+    }
+
+    // --- SETTINGS MODAL ---
+    function openSettingsModal() {
+      document.getElementById('cfg-pin').value = config.pin;
+      document.getElementById('cfg-url').value = config.sheetUrl || '';
+      const m = document.getElementById('settings-modal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+
+    function closeSettingsModal() {
+      const m = document.getElementById('settings-modal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+    }
+
+    async function saveSettings() {
+      const newPin = document.getElementById('cfg-pin').value.trim();
+      const newUrl = document.getElementById('cfg-url').value.trim();
+
+      if (!/^\d{4}$/.test(newPin)) {
+        alert('El PIN debe ser exactamente de 4 números.');
+        return;
+      }
+
+      config.pin = newPin;
+      config.sheetUrl = newUrl;
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+      closeSettingsModal();
+      updateCloudUI();
+
+      if (newUrl) {
+        await syncFromCloud();
+      }
+    }
+
+    // Init
+    document.getElementById('tx-date').value = todayStr;
+    setFormType('expense');
+    lucide.createIcons();
+  </script>
+</body>
+</html>
