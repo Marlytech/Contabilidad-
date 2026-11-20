@@ -80,10 +80,6 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <button onclick="openSettingsModal()" class="flex items-center gap-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white px-3 py-2 rounded-xl transition cursor-pointer">
-          <i data-lucide="cloud-cog" class="w-4 h-4 text-emerald-300"></i>
-          <span>Nube y PIN</span>
-        </button>
         <button onclick="lockApp()" title="Bloquear pantalla" class="flex items-center gap-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white px-3 py-2 rounded-xl transition cursor-pointer">
           <i data-lucide="lock" class="w-4 h-4"></i>
           <span>Bloquear</span>
@@ -337,51 +333,10 @@
 
   </main>
 
-  <!-- MODAL: NUBE GOOGLE SHEETS Y PIN -->
-  <div id="settings-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-          <i data-lucide="shield-check" class="w-5 h-5 text-emerald-600"></i>
-          <span>Seguridad PIN y Nube Privada</span>
-        </h3>
-        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-700 cursor-pointer">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <div class="space-y-4 text-sm">
-        <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">1. PIN de Acceso (4 dígitos)</label>
-          <input type="password" id="cfg-pin" maxlength="4" pattern="\d{4}" placeholder="Ej. 2315"
-            class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" />
-          <p class="text-[11px] text-slate-500 mt-1">Debe coincidir con el <code>PIN_SECRETO</code> configurado en tu Google Apps Script.</p>
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">2. URL de Google Apps Script (Nube Privada)</label>
-          <input type="url" id="cfg-url" placeholder="https://script.google.com/macros/s/.../exec"
-            class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-xs" />
-          <p class="text-[11px] text-slate-500 mt-1">Sincroniza tus movimientos con tu hoja de Google Sheets.</p>
-        </div>
-
-        <div class="flex gap-2 pt-2">
-          <button onclick="saveSettings()" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl cursor-pointer">
-            Guardar Configuración
-          </button>
-          <button onclick="closeSettingsModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer">
-            Cancelar
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <script>
     const STORAGE_KEY = 'consultoria_contabilidad_v2';
     const CONFIG_KEY = 'consultoria_config_v2';
 
-    // Configuración precargada con tu PIN y URL de Google Apps Script
     const DEFAULT_CONFIG = {
       pin: '2315',
       sheetUrl: 'https://script.google.com/macros/s/AKfycbwALKn8T9y1uYsXvyi1txt8B91mkL0e-uskyRYYHshudHsZTr-rUzoE7sqPpUJuy4Gj/exec'
@@ -406,7 +361,30 @@
       ]
     };
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    function formatDateClean(val) {
+      if (!val) return '';
+      const str = String(val).trim();
+      const isoMatch = str.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (isoMatch) return isoMatch[1];
+      const parsed = new Date(str);
+      if (!isNaN(parsed.getTime())) {
+        const y = parsed.getFullYear();
+        const m = String(parsed.getMonth() + 1).padStart(2, '0');
+        const d = String(parsed.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+      return str.split('00:00:00')[0].trim();
+    }
+
+    function normalizeTx(tx) {
+      return {
+        ...tx,
+        amount: Number(tx.amount) || 0,
+        date: formatDateClean(tx.date)
+      };
+    }
+
+    const todayStr = formatDateClean(new Date());
 
     const defaultData = [
       {
@@ -425,7 +403,8 @@
       pin: (savedConfig && savedConfig.pin) || DEFAULT_CONFIG.pin,
       sheetUrl: (savedConfig && savedConfig.sheetUrl) || DEFAULT_CONFIG.sheetUrl
     };
-    let transactions = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultData;
+    let rawSaved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    let transactions = Array.isArray(rawSaved) ? rawSaved.map(normalizeTx) : defaultData;
     let enteredPin = '';
 
     // --- PIN LOCK LOGIC ---
@@ -468,8 +447,8 @@
           if (json.status === 'ok') {
             config.pin = enteredPin;
             localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-            if (json.data && json.data.length > 0) {
-              transactions = json.data;
+            if (Array.isArray(json.data) && json.data.length > 0) {
+              transactions = json.data.map(normalizeTx);
               saveData();
             }
             unlockApp();
@@ -552,7 +531,9 @@
         const res = await fetch(`${config.sheetUrl}?pin=${encodeURIComponent(config.pin)}`);
         const json = await res.json();
         if (json.status === 'ok') {
-          transactions = json.data.length > 0 ? json.data : defaultData;
+          transactions = Array.isArray(json.data) && json.data.length > 0
+            ? json.data.map(normalizeTx)
+            : defaultData;
           saveData();
           renderAll();
         }
@@ -610,7 +591,7 @@
       const formType = document.getElementById('tx-type').value;
       const desc = document.getElementById('tx-desc').value.trim();
       const amount = parseFloat(document.getElementById('tx-amount').value);
-      const date = document.getElementById('tx-date').value;
+      const date = formatDateClean(document.getElementById('tx-date').value);
       const category = document.getElementById('tx-category').value;
       const method = document.getElementById('tx-method').value;
 
@@ -650,9 +631,10 @@
       let totalExpenses = 0;
 
       transactions.forEach(t => {
-        if (t.type === 'capital') totalCapital += t.amount;
-        else if (t.type === 'income') totalIncome += t.amount;
-        else if (t.type === 'expense') totalExpenses += t.amount;
+        const amt = Number(t.amount) || 0;
+        if (t.type === 'capital') totalCapital += amt;
+        else if (t.type === 'income') totalIncome += amt;
+        else if (t.type === 'expense') totalExpenses += amt;
       });
 
       const currentBalance = totalCapital + totalIncome - totalExpenses;
@@ -689,10 +671,11 @@
           const badgeColor = isExp ? 'bg-rose-50 text-rose-700' : isCap ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700';
           const amountColor = isExp ? 'text-rose-600' : isCap ? 'text-indigo-600' : 'text-emerald-600';
           const sign = isExp ? '-' : '+';
+          const cleanDate = formatDateClean(t.date);
 
           return `
             <tr class="hover:bg-slate-50/80 transition">
-              <td class="py-3 px-2 text-xs text-slate-500 whitespace-nowrap">${t.date}</td>
+              <td class="py-3 px-2 text-xs text-slate-500 whitespace-nowrap">${cleanDate}</td>
               <td class="py-3 px-2">
                 <div class="font-medium text-slate-800 text-xs sm:text-sm">${t.desc}</div>
                 <div class="flex items-center gap-1.5 mt-0.5">
@@ -727,9 +710,10 @@
       document.getElementById('rep-full-table').innerHTML = transactions.map(t => {
         const typeLabel = t.type === 'expense' ? 'Gasto' : t.type === 'capital' ? 'Capital' : 'Ingreso';
         const sign = t.type === 'expense' ? '-' : '+';
+        const cleanDate = formatDateClean(t.date);
         return `
           <tr>
-            <td class="py-2 px-3 whitespace-nowrap">${t.date}</td>
+            <td class="py-2 px-3 whitespace-nowrap">${cleanDate}</td>
             <td class="py-2 px-3 font-medium">${typeLabel}</td>
             <td class="py-2 px-3">${t.category}</td>
             <td class="py-2 px-3">${t.desc}</td>
@@ -746,7 +730,7 @@
       const container = document.getElementById(containerId);
       const map = {};
       transactions.filter(t => t.type === type).forEach(t => {
-        map[t.category] = (map[t.category] || 0) + t.amount;
+        map[t.category] = (map[t.category] || 0) + (Number(t.amount) || 0);
       });
 
       const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
@@ -794,12 +778,12 @@
     function exportCSV() {
       const headers = ['Fecha', 'Tipo', 'Categoria', 'Concepto', 'Metodo', 'Monto'];
       const rows = transactions.map(t => [
-        t.date,
+        formatDateClean(t.date),
         t.type === 'expense' ? 'Gasto' : t.type === 'capital' ? 'Capital' : 'Ingreso',
         `"${t.category}"`,
-        `"${t.desc.replace(/"/g, '""')}"`,
+        `"${String(t.desc).replace(/"/g, '""')}"`,
         `"${t.method}"`,
-        t.type === 'expense' ? -t.amount : t.amount
+        t.type === 'expense' ? -Number(t.amount) : Number(t.amount)
       ]);
       const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
       const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -827,7 +811,7 @@
         try {
           const parsed = JSON.parse(evt.target.result);
           if (Array.isArray(parsed)) {
-            transactions = parsed;
+            transactions = parsed.map(normalizeTx);
             saveData();
             renderAll();
             alert('Respaldo restaurado correctamente.');
@@ -844,41 +828,6 @@
       transactions = JSON.parse(JSON.stringify(defaultData));
       saveData();
       renderAll();
-    }
-
-    // --- SETTINGS MODAL ---
-    function openSettingsModal() {
-      document.getElementById('cfg-pin').value = config.pin;
-      document.getElementById('cfg-url').value = config.sheetUrl || '';
-      const m = document.getElementById('settings-modal');
-      m.classList.remove('hidden');
-      m.classList.add('flex');
-    }
-
-    function closeSettingsModal() {
-      const m = document.getElementById('settings-modal');
-      m.classList.add('hidden');
-      m.classList.remove('flex');
-    }
-
-    async function saveSettings() {
-      const newPin = document.getElementById('cfg-pin').value.trim();
-      const newUrl = document.getElementById('cfg-url').value.trim();
-
-      if (!/^\d{4}$/.test(newPin)) {
-        alert('El PIN debe ser exactamente de 4 números.');
-        return;
-      }
-
-      config.pin = newPin;
-      config.sheetUrl = newUrl;
-      localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-      closeSettingsModal();
-      updateCloudUI();
-
-      if (newUrl) {
-        await syncFromCloud();
-      }
     }
 
     // Init
